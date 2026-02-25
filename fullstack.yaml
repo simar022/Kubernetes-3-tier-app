@@ -1,0 +1,203 @@
+# 1. DATABASE (PostgreSQL)
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-service
+spec:
+  selector:
+    tier: db-layer
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: database
+spec:
+  selector:
+    matchLabels:
+      tier: db-layer
+  template:
+    metadata:
+      labels:
+        tier: db-layer
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_PASSWORD
+          value: "mypassword"
+        ports:
+        - containerPort: 5432
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+---
+# 2. BACKEND (Node.js API)
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: NodePort
+  selector:
+    tier: api-layer
+  ports:
+    - port: 5000
+      targetPort: 5000
+      nodePort: 31001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      tier: api-layer
+  template:
+    metadata:
+      labels:
+        tier: api-layer
+    spec:
+      containers:
+      - name: backend
+        image: simarjitsingh22/ecommerce-backend:v3
+        imagePullPolicy: Never
+        resources:
+          requests:
+            cpu: "100m"    # 100 milli-cpus (baseline for HPA)
+            memory: "128Mi"
+          limits:
+            cpu: "500m"    # Maximum allowed
+            memory: "256Mi"
+        env:
+        - name: DB_HOST
+          value: "db-service" # Internal DNS name
+        - name: DB_NAME
+          value: "postgres"
+        - name: DB_USER
+          value: "postgres"
+        - name: DB_PASSWORD
+          value: "mypassword"
+        ports:
+        - containerPort: 5000
+        livenessProbe:
+          httpGet:
+            path: /products
+            port: 5000
+          initialDelaySeconds: 10 # Give it time to start
+          periodSeconds: 5        # Check every 5 seconds
+          timeoutSeconds: 2       # If it takes >2s, it's a "fail"
+          failureThreshold: 3
+---
+# 3. FRONTEND (React + Nginx)
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  type: NodePort
+  selector:
+    tier: ui-layer
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 31005
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      tier: ui-layer
+  template:
+    metadata:
+      labels:
+        tier: ui-layer
+    spec:
+      containers:
+      - name: frontend
+        image: simarjitsingh22/ecommerce-frontend:v5
+        imagePullPolicy: Never
+        resources:
+          requests:
+            cpu: "100m"    # 100 milli-cpus (baseline for HPA)
+            memory: "128Mi"
+          limits:
+            cpu: "500m"    # Maximum allowed
+            memory: "256Mi"
+        ports:
+        - containerPort: 80
+---        
+# 4. HPA (Autoscaling of Pods)        
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 1
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50 # Lowered to 20% to make it more sensitive
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0 # Scaled up immediately
+      policies:
+      - type: Percent
+        value: 100 # Double the number of pods every 15 seconds
+        periodSeconds: 5
+      - type: Pods
+        value: 4 # Or add 4 pods immediately (whichever is higher)
+        periodSeconds: 5
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 150 # Wait 2.5 mins before scaling down (Pro standard)
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 5
+---
+#Ingress Controller      
+# 5. Ingress Controller (Entry Point)
+# 5. Ingress Controller (Modern Spec)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ecommerce-ingress
+spec:
+  ingressClassName: nginx  # Replaces the deprecated annotation
+  rules:
+  - host: kubestore.local
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 5000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
