@@ -120,8 +120,17 @@ spec:
       target:
         type: Utilization
         averageUtilization: 50
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 5
+    scaleDown:
+      stabilizationWindowSeconds: 120
 ---
-# 5. INGRESS (Corrected Priority)
+# 5. INGRESS 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -148,3 +157,14 @@ spec:
             name: frontend-service
             port:
               number: 80
+---
+#QUOTA
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: backend-quota
+spec:
+  hard:
+    requests.cpu: "2"      
+    requests.memory: "2Gi" 
+    pods: "8"             
