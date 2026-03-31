@@ -62,22 +62,25 @@ The system is architected into specialized micro-services to ensure fault tolera
 
 📦 1. **Clone the Repository**
 
-git clone https://github.com/your-username/flashstore.git
-cd flashstore
+*git clone https://github.com/your-username/flashstore.git*
+
+*cd flashstore*
 
 🚢 2. **Deploy to Kubernetes**
 
 Apply the manifests in order to ensure dependencies (like the database) are ready first:
 
-minikube start
-minikube addons enable metrics-server
+*minikube start*
 
-kubectl apply -f k8s/db-deployment.yaml
+*minikube addons enable metrics-server*
 
-kubectl apply -f k8s/backend-deployment.yaml
-kubectl apply -f k8s/frontend-deployment.yaml
+*kubectl apply -f k8s/db-deployment.yaml*
 
-kubectl apply -f k8s/backend-hpa.yaml
+*kubectl apply -f k8s/backend-deployment.yaml*
+
+*kubectl apply -f k8s/frontend-deployment.yaml*
+
+*kubectl apply -f k8s/backend-hpa.yaml*
 
 🌐 3. **Access the App**
 
