@@ -69,18 +69,14 @@ cd flashstore
 
 Apply the manifests in order to ensure dependencies (like the database) are ready first:
 
-//Start Minikube & Enable Metrics (Required for HPA)
 minikube start
 minikube addons enable metrics-server
 
-//Deploy Database
 kubectl apply -f k8s/db-deployment.yaml
 
-//Deploy Backend & Frontend
 kubectl apply -f k8s/backend-deployment.yaml
 kubectl apply -f k8s/frontend-deployment.yaml
 
-//Apply Scaling Policies
 kubectl apply -f k8s/backend-hpa.yaml
 
 🌐 3. **Access the App**
